@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check-in scanner</title>
+<style>
+  :root {
+    --bg: #eef1f5;
+    --panel: #ffffff;
+    --text: #14181f;
+    --muted: #5d6675;
+    --line: #d5dae3;
+    --accent: #1b4fd8;
+    --accent-text: #ffffff;
+    --ok: #0f8a4b;
+    --warn: #b36b00;
+    --err: #c62f26;
+    --idle: #3b4558;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1218;
+      --panel: #181d27;
+      --text: #eef1f6;
+      --muted: #96a0b2;
+      --line: #2b3342;
+      --accent: #6d94ff;
+      --accent-text: #0b1020;
+      --ok: #1fa862;
+      --warn: #c98a1a;
+      --err: #e0463c;
+      --idle: #2b3342;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.4;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  }
+  main { max-width: 520px; margin: 0 auto; padding: 14px; display: grid; gap: 12px; }
+
+  /* The status banner is the one loud element: it floods with the result colour */
+  .status {
+    border-radius: 14px;
+    padding: 20px 18px;
+    background: var(--idle);
+    color: #fff;
+    min-height: 118px;
+    display: flex; flex-direction: column; justify-content: center;
+    transition: background-color .15s ease;
+  }
+  .status.ok { background: var(--ok); }
+  .status.warn { background: var(--warn); }
+  .status.err { background: var(--err); }
+  .status h1 { font-size: 1.7rem; line-height: 1.15; margin: 0 0 4px; overflow-wrap: anywhere; }
+  .status p { margin: 0; font-size: 1rem; opacity: .95; overflow-wrap: anywhere; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 0; }
+  #reader video { border-radius: 8px; }
+
+  label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: 4px; }
+  input {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+  }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer;
+    background: var(--accent); color: var(--accent-text);
+    border: 0; border-radius: 8px; padding: 12px 18px; min-height: 46px;
+  }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button.wide { width: 100%; margin-top: 10px; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .meta { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 6px; }
+  .meta strong { font-size: 1.1rem; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: .95rem; }
+  li:first-child { border-top: 0; }
+  li span:first-child { color: var(--muted); white-space: nowrap; }
+  li span:last-child { text-align: right; overflow-wrap: anywhere; }
+  li.ok span:last-child { color: var(--ok); }
+  li.warn span:last-child { color: var(--warn); }
+  li.err span:last-child { color: var(--err); }
+  .empty { color: var(--muted); font-size: .95rem; margin: 0; }
+</style>
+</head>
+<body>
+<main>
+  <section class="status" id="status" aria-live="polite">
+    <h1 id="sTitle">Ready to scan</h1>
+    <p id="sDetail">Enter the staff PIN, then start the scanner.</p>
+  </section>
+
+  <section class="panel">
+    <div id="reader"></div>
+    <div style="margin-top:10px">
+      <label for="pin">Staff PIN</label>
+      <input id="pin" type="password" inputmode="numeric" autocomplete="off">
+    </div>
+    <button id="toggle" class="wide">Start scanner</button>
+  </section>
+
+  <section class="panel">
+    <label for="manual">QR not scanning? Type the ID</label>
+    <div class="row">
+      <input id="manual" type="text" autocapitalize="characters" autocomplete="off" placeholder="EVT-XXXXXXXX">
+      <button id="manualBtn" class="secondary">Check in</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <p class="meta"><span>Checked in this session</span><strong id="count">0</strong></p>
+    <ul id="history"></ul>
+    <p class="empty" id="emptyNote">No scans yet.</p>
+  </section>
+</main>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  // Paste the Web app URL you get after deploying the Apps Script (ends with /exec)
+  const SCRIPT_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
+
+  const $ = (id) => document.getElementById(id);
+  let scanner = null, running = false, busy = false, lastText = '', lastTime = 0, count = 0;
+
+  function getPin() { try { return localStorage.getItem('checkin-pin') || ''; } catch (e) { return ''; } }
+  function savePin(v) { try { localStorage.setItem('checkin-pin', v); } catch (e) {} }
+  function buzz(p) { if (navigator.vibrate) navigator.vibrate(p); }
+
+  $('pin').value = getPin();
+
+  function show(kind, title, detail) {
+    $('status').className = 'status ' + kind;
+    $('sTitle').textContent = title;
+    $('sDetail').textContent = detail || '';
+  }
+
+  function addHistory(kind, label) {
+    $('emptyNote').hidden = true;
+    const li = document.createElement('li');
+    li.className = kind;
+    const t = document.createElement('span');
+    t.textContent = new Date().toLocaleTimeString();
+    const n = document.createElement('span');
+    n.textContent = label;
+    li.append(t, n);
+    const ul = $('history');
+    ul.prepend(li);
+    while (ul.children.length > 8) ul.lastChild.remove();
+  }
+
+  async function checkIn(id) {
+    if (SCRIPT_URL.indexOf('PASTE_') === 0) {
+      show('err', 'Scanner not set up', 'Add your Web app URL to SCRIPT_URL in this file.');
+      return;
+    }
+    const pin = $('pin').value.trim();
+    if (!pin) { show('err', 'Enter the staff PIN', 'The PIN field is empty.'); return; }
+
+    show('', 'Checking...', id);
+    try {
+      const url = SCRIPT_URL + '?id=' + encodeURIComponent(id) + '&key=' + encodeURIComponent(pin);
+      const res = await fetch(url);
+      const d = await res.json();
+
+      if (d.status === 'ok') {
+        count++;
+        $('count').textContent = count;
+        show('ok', 'Welcome, ' + d.name + '!', 'Checked in at ' + d.time);
+        addHistory('ok', d.name);
+        buzz(80);
+      } else if (d.status === 'duplicate') {
+        show('warn', 'Already checked in', d.name + ' - first scan at ' + d.time);
+        addHistory('warn', d.name + ' (again)');
+        buzz([100, 60, 100]);
+      } else {
+        const msg = d.message || 'Something went wrong';
+        show('err', msg, id);
+        addHistory('err', msg);
+        buzz(300);
+      }
+    } catch (e) {
+      show('err', 'Could not reach the sheet', 'Check the internet connection and the SCRIPT_URL.');
+    }
+  }
+
+  function onScan(text) {
+    const now = Date.now();
+    if (busy || (text === lastText && now - lastTime < 4000)) return;
+    busy = true; lastText = text; lastTime = now;
+    checkIn(text.trim()).finally(() => setTimeout(() => { busy = false; }, 1200));
+  }
+
+  async function toggle() {
+    if (running) {
+      await scanner.stop();
+      running = false;
+      $('toggle').textContent = 'Start scanner';
+      return;
+    }
+    if (!$('pin').value.trim()) { show('err', 'Enter the staff PIN first', ''); return; }
+    savePin($('pin').value.trim());
+    scanner = scanner || new Html5Qrcode('reader');
+    try {
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        onScan,
+        () => {}
+      );
+      running = true;
+      $('toggle').textContent = 'Stop scanner';
+      show('', 'Scanning', 'Hold a QR code in front of the camera.');
+    } catch (e) {
+      show('err', 'Camera not available', 'Allow camera permission, and open this page over https.');
+    }
+  }
+
+  $('toggle').addEventListener('click', toggle);
+  $('manualBtn').addEventListener('click', () => {
+    const v = $('manual').value.trim();
+    if (v) { checkIn(v); $('manual').value = ''; }
+  });
+  $('manual').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('manualBtn').click(); });
+</script>
+</body>
+</html>
