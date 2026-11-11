@@ -1,235 +1,289 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Check-in scanner</title>
+<title>Event Check-in</title>
 <style>
-  :root {
-    --bg: #eef1f5;
-    --panel: #ffffff;
-    --text: #14181f;
-    --muted: #5d6675;
-    --line: #d5dae3;
-    --accent: #1b4fd8;
-    --accent-text: #ffffff;
-    --ok: #0f8a4b;
-    --warn: #b36b00;
-    --err: #c62f26;
-    --idle: #3b4558;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0f1218;
-      --panel: #181d27;
-      --text: #eef1f6;
-      --muted: #96a0b2;
-      --line: #2b3342;
-      --accent: #6d94ff;
-      --accent-text: #0b1020;
-      --ok: #1fa862;
-      --warn: #c98a1a;
-      --err: #e0463c;
-      --idle: #2b3342;
-    }
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
-    line-height: 1.4;
-    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
-  }
-  main { max-width: 520px; margin: 0 auto; padding: 14px; display: grid; gap: 12px; }
-
-  /* The status banner is the one loud element: it floods with the result colour */
-  .status {
-    border-radius: 14px;
-    padding: 20px 18px;
-    background: var(--idle);
-    color: #fff;
-    min-height: 118px;
-    display: flex; flex-direction: column; justify-content: center;
-    transition: background-color .15s ease;
-  }
-  .status.ok { background: var(--ok); }
-  .status.warn { background: var(--warn); }
-  .status.err { background: var(--err); }
-  .status h1 { font-size: 1.7rem; line-height: 1.15; margin: 0 0 4px; overflow-wrap: anywhere; }
-  .status p { margin: 0; font-size: 1rem; opacity: .95; overflow-wrap: anywhere; }
-
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
-  #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 0; }
-  #reader video { border-radius: 8px; }
-
-  label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: 4px; }
-  input {
-    width: 100%; font: inherit; color: var(--text); background: var(--bg);
-    border: 1px solid var(--line); border-radius: 8px; padding: 12px;
-  }
-  .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
-  button {
-    font: inherit; font-weight: 600; cursor: pointer;
-    background: var(--accent); color: var(--accent-text);
-    border: 0; border-radius: 8px; padding: 12px 18px; min-height: 46px;
-  }
-  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
-  button.wide { width: 100%; margin-top: 10px; }
-  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-
-  .meta { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 6px; }
-  .meta strong { font-size: 1.1rem; }
-  ul { list-style: none; margin: 0; padding: 0; }
-  li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: .95rem; }
-  li:first-child { border-top: 0; }
-  li span:first-child { color: var(--muted); white-space: nowrap; }
-  li span:last-child { text-align: right; overflow-wrap: anywhere; }
-  li.ok span:last-child { color: var(--ok); }
-  li.warn span:last-child { color: var(--warn); }
-  li.err span:last-child { color: var(--err); }
-  .empty { color: var(--muted); font-size: .95rem; margin: 0; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,sans-serif;background:#111;color:#fff;display:flex;flex-direction:column;height:100vh}
+  header{padding:10px 16px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  #who{font-weight:400;font-size:13px;opacity:.7}
+  #count{opacity:.7;font-weight:400;font-size:14px}
+  #modes{display:flex;gap:8px;padding:0 12px 8px}
+  #modes button{flex:1;margin:0;background:#333;color:#fff}
+  #modes button.on{background:#2563eb}
+  #modes .small{flex:0 0 auto;background:#222}
+  #stage{position:relative;flex:1;overflow:hidden;background:#000}
+  video{width:100%;height:100%;object-fit:cover}
+  #frame{position:absolute;inset:0;margin:auto;width:65%;aspect-ratio:1;border:3px solid #fff;border-radius:16px;box-shadow:0 0 0 999px rgba(0,0,0,.45)}
+  #result{padding:12px 16px;min-height:110px;text-align:center;font-size:16px}
+  #result .tag{font-size:15px;letter-spacing:.5px;opacity:.95}
+  #result .name{font-size:30px;font-weight:700;margin:4px 0;line-height:1.15;word-break:break-word}
+  #result small{display:block;opacity:.9;font-size:13px;margin-top:2px;word-break:break-all}
+  .ok{background:#15803d}.dup{background:#b45309}.bad{background:#b91c1c}.wait{background:#222}
+  #manual{display:flex;gap:8px;padding:8px 12px;background:#181818}
+  #manual input{flex:1;padding:12px;border-radius:8px;border:0;font-size:16px;text-transform:uppercase}
+  button{margin:0;padding:10px 16px;border:0;border-radius:8px;font-size:15px}
+  #torch{margin:6px 12px}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10}
+  .overlay[hidden]{display:none}
+  .card{background:#1f2937;border-radius:14px;padding:18px;width:100%;max-width:380px}
+  .card input{width:100%;padding:12px;margin:6px 0;border-radius:8px;border:0;font-size:18px}
+  .card .row{display:flex;gap:8px}
+  .card .row button{flex:1;margin-top:6px}
+  #lockmsg{min-height:20px;font-size:14px;color:#fca5a5;margin-top:6px}
 </style>
 </head>
 <body>
-<main>
-  <section class="status" id="status" aria-live="polite">
-    <h1 id="sTitle">Ready to scan</h1>
-    <p id="sDetail">Enter the staff PIN, then start the scanner.</p>
-  </section>
+<header><span>Check-in scanner</span><span id="who"></span><span id="count">0 checked in</span></header>
+<div id="modes">
+  <button id="mEntry" class="on">Entry</button>
+  <button id="mReg">Register</button>
+  <button id="lockBtn" class="small" title="Lock">🔒</button>
+  <button id="reset" class="small" title="Change URL">⚙</button>
+</div>
+<div id="stage"><video id="v" playsinline muted></video><div id="frame"></div></div>
+<div id="result" class="wait">Locked</div>
+<div id="manual">
+  <input id="mid" placeholder="Scan not working? Type ticket ID" autocomplete="off" autocapitalize="characters">
+  <button id="mgo" style="background:#2563eb;color:#fff">Go</button>
+</div>
+<button id="torch" hidden>Toggle flashlight</button>
 
-  <section class="panel">
-    <div id="reader"></div>
-    <div style="margin-top:10px">
-      <label for="pin">Staff PIN</label>
-      <input id="pin" type="password" inputmode="numeric" autocomplete="off">
-    </div>
-    <button id="toggle" class="wide">Start scanner</button>
-  </section>
+<div id="lock" class="overlay"><div class="card">
+  <b>Staff login</b>
+  <p style="margin:6px 0;font-size:14px;opacity:.8">Enter your staff code to open the scanner.</p>
+  <input id="code" type="password" inputmode="numeric" placeholder="Staff code" autocomplete="off">
+  <div id="lockmsg"></div>
+  <div class="row"><button id="unlockBtn" style="background:#15803d;color:#fff">Unlock</button></div>
+</div></div>
 
-  <section class="panel">
-    <label for="manual">QR not scanning? Type the ID</label>
-    <div class="row">
-      <input id="manual" type="text" autocapitalize="characters" autocomplete="off" placeholder="EVT-XXXXXXXX">
-      <button id="manualBtn" class="secondary">Check in</button>
-    </div>
-  </section>
+<div id="panel" class="overlay" hidden><div class="card">
+  <b>Register ticket <span id="pid"></span></b>
+  <input id="pname" placeholder="Full name" autocomplete="off">
+  <input id="pcontact" placeholder="Phone or email (optional)" autocomplete="off">
+  <div class="row"><button id="psave" style="background:#15803d;color:#fff">Save</button><button id="pcancel" style="background:#444;color:#fff">Cancel</button></div>
+</div></div>
 
-  <section class="panel">
-    <p class="meta"><span>Checked in this session</span><strong id="count">0</strong></p>
-    <ul id="history"></ul>
-    <p class="empty" id="emptyNote">No scans yet.</p>
-  </section>
-</main>
-
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>
-  // Paste the Web app URL you get after deploying the Apps Script (ends with /exec)
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzw7IxLG0-EAfnu6dguldVQX6gfocYeWFkEFSpCYklm9qkE6RjEhJOXodiGJcbdlv419w/exec';
-
-  const $ = (id) => document.getElementById(id);
-  let scanner = null, running = false, busy = false, lastText = '', lastTime = 0, count = 0;
-
-  function getPin() { try { return localStorage.getItem('checkin-pin') || ''; } catch (e) { return ''; } }
-  function savePin(v) { try { localStorage.setItem('checkin-pin', v); } catch (e) {} }
-  function buzz(p) { if (navigator.vibrate) navigator.vibrate(p); }
-
-  $('pin').value = getPin();
-
-  function show(kind, title, detail) {
-    $('status').className = 'status ' + kind;
-    $('sTitle').textContent = title;
-    $('sDetail').textContent = detail || '';
+// The Apps Script URL is asked once per phone and remembered.
+// You can also open the page as  ?api=YOUR_EXEC_URL  to set it.
+function cfgApi() {
+  let v = '';
+  try { v = localStorage.getItem('api') || ''; } catch (e) {}
+  const q = new URLSearchParams(location.search).get('api');
+  if (q) { v = q; try { localStorage.setItem('api', v); } catch (e) {} }
+  if (!v) {
+    v = (prompt('Paste the Apps Script web app URL (ends with /exec)') || '').trim();
+    if (v) { try { localStorage.setItem('api', v); } catch (e) {} }
   }
+  return v;
+}
+const API_URL = cfgApi();
+let KEY = '';
 
-  function addHistory(kind, label) {
-    $('emptyNote').hidden = true;
-    const li = document.createElement('li');
-    li.className = kind;
-    const t = document.createElement('span');
-    t.textContent = new Date().toLocaleTimeString();
-    const n = document.createElement('span');
-    n.textContent = label;
-    li.append(t, n);
-    const ul = $('history');
-    ul.prepend(li);
-    while (ul.children.length > 8) ul.lastChild.remove();
-  }
+const $ = (id) => document.getElementById(id);
+const v = $('v'), box = $('result');
+const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
+const detector = 'BarcodeDetector' in window ? new BarcodeDetector({ formats: ['qr_code'] }) : null;
+let busy = false, lastId = '', lastAt = 0, checkedIn = 0, track = null, mode = 'entry', pendingId = '', running = false;
 
-  async function checkIn(id) {
-    if (SCRIPT_URL.indexOf('PASTE_') === 0) {
-      show('err', 'Scanner not set up', 'Add your Web app URL to SCRIPT_URL in this file.');
-      return;
-    }
-    const pin = $('pin').value.trim();
-    if (!pin) { show('err', 'Enter the staff PIN', 'The PIN field is empty.'); return; }
+function show(cls, html) { box.className = cls; box.innerHTML = html; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function beep(ok) {
+  try {
+    const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator();
+    o.frequency.value = ok ? 880 : 300; o.connect(a.destination); o.start(); o.stop(a.currentTime + .15);
+  } catch (e) {}
+  if (navigator.vibrate) navigator.vibrate(ok ? 80 : [80, 60, 80]);
+}
 
-    show('', 'Checking...', id);
-    try {
-      const url = SCRIPT_URL + '?id=' + encodeURIComponent(id) + '&key=' + encodeURIComponent(pin);
-      const res = await fetch(url);
-      const d = await res.json();
-
-      if (d.status === 'ok') {
-        count++;
-        $('count').textContent = count;
-        show('ok', 'Welcome, ' + d.name + '!', 'Checked in at ' + d.time);
-        addHistory('ok', d.name);
-        buzz(80);
-      } else if (d.status === 'duplicate') {
-        show('warn', 'Already checked in', d.name + ' - first scan at ' + d.time);
-        addHistory('warn', d.name + ' (again)');
-        buzz([100, 60, 100]);
-      } else {
-        const msg = d.message || 'Something went wrong';
-        show('err', msg, id);
-        addHistory('err', msg);
-        buzz(300);
-      }
-    } catch (e) {
-      show('err', 'Could not reach the sheet', 'Check the internet connection and the SCRIPT_URL.');
-    }
-  }
-
-  function onScan(text) {
-    const now = Date.now();
-    if (busy || (text === lastText && now - lastTime < 4000)) return;
-    busy = true; lastText = text; lastTime = now;
-    checkIn(text.trim()).finally(() => setTimeout(() => { busy = false; }, 1200));
-  }
-
-  async function toggle() {
-    if (running) {
-      await scanner.stop();
-      running = false;
-      $('toggle').textContent = 'Start scanner';
-      return;
-    }
-    if (!$('pin').value.trim()) { show('err', 'Enter the staff PIN first', ''); return; }
-    savePin($('pin').value.trim());
-    scanner = scanner || new Html5Qrcode('reader');
-    try {
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
-        onScan,
-        () => {}
-      );
-      running = true;
-      $('toggle').textContent = 'Stop scanner';
-      show('', 'Scanning', 'Hold a QR code in front of the camera.');
-    } catch (e) {
-      show('err', 'Camera not available', 'Allow camera permission, and open this page over https.');
-    }
-  }
-
-  $('toggle').addEventListener('click', toggle);
-  $('manualBtn').addEventListener('click', () => {
-    const v = $('manual').value.trim();
-    if (v) { checkIn(v); $('manual').value = ''; }
+// JSONP: loads the response as a script, which avoids browser cross-origin blocking
+function lookup(params) {
+  return new Promise((resolve, reject) => {
+    const name = 'cb' + Date.now() + Math.floor(Math.random() * 1000);
+    const s = document.createElement('script');
+    const done = () => { clearTimeout(t); delete window[name]; s.remove(); };
+    const t = setTimeout(() => { done(); reject(new Error('timeout')); }, 15000);
+    window[name] = (data) => { done(); resolve(data); };
+    s.onerror = () => { done(); reject(new Error('script load failed')); };
+    const qs = Object.keys(params).map(k => k + '=' + encodeURIComponent(params[k])).join('&');
+    s.src = API_URL + '?key=' + encodeURIComponent(KEY) + '&' + qs + '&callback=' + name;
+    document.body.appendChild(s);
   });
-  $('manual').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('manualBtn').click(); });
+}
+
+// ---------- staff lock ----------
+async function unlock(code) {
+  $('lockmsg').style.color = '#9ca3af'; $('lockmsg').textContent = 'Checking…';
+  KEY = code;
+  try {
+    const d = await lookup({ action: 'auth' });
+    if (d.status === 'ok') {
+      try { sessionStorage.setItem('code', code); } catch (e) {}
+      $('who').textContent = d.staff;
+      $('lock').hidden = true; $('code').value = ''; $('lockmsg').textContent = '';
+      await startCamera();
+    } else {
+      KEY = ''; $('lockmsg').style.color = '#fca5a5'; $('lockmsg').textContent = d.message || 'Wrong staff code';
+    }
+  } catch (e) {
+    KEY = ''; $('lockmsg').style.color = '#fca5a5'; $('lockmsg').textContent = 'Network error: ' + e.message;
+  }
+}
+function lockNow() {
+  stopCamera(); KEY = '';
+  try { sessionStorage.removeItem('code'); } catch (e) {}
+  $('who').textContent = ''; show('wait', 'Locked');
+  $('lock').hidden = false; $('lockmsg').textContent = '';
+  setTimeout(() => $('code').focus(), 50);
+}
+$('unlockBtn').onclick = () => { const c = $('code').value.trim(); if (c) unlock(c); };
+$('code').onkeydown = (e) => { if (e.key === 'Enter') $('unlockBtn').click(); };
+$('lockBtn').onclick = lockNow;
+$('reset').onclick = () => {
+  try { localStorage.removeItem('api'); } catch (e) {}
+  lockNow(); location.href = location.pathname;
+};
+
+// ---------- modes ----------
+function setMode(m) {
+  mode = m;
+  $('mEntry').className = m === 'entry' ? 'on' : '';
+  $('mReg').className = m === 'register' ? 'on' : '';
+  show('wait', m === 'entry' ? 'Entry mode: scan a ticket' : 'Register mode: scan a ticket to assign a name');
+}
+$('mEntry').onclick = () => setMode('entry');
+$('mReg').onclick = () => setMode('register');
+function resume() { busy = false; setMode(mode); }
+
+// ---------- camera ----------
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false
+    });
+    v.srcObject = stream; await v.play();
+    track = stream.getVideoTracks()[0];
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.focusMode && caps.focusMode.includes('continuous'))
+      track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+    if (caps.torch) {
+      const t = $('torch'); t.hidden = false;
+      let on = false;
+      t.onclick = () => track.applyConstraints({ advanced: [{ torch: on = !on }] });
+    }
+    running = true; busy = false;
+    setMode(mode);
+    requestAnimationFrame(tick);
+  } catch (err) {
+    show('bad', 'Camera blocked<small>Allow camera access, or type the ticket ID below.</small>');
+  }
+}
+function stopCamera() {
+  running = false;
+  if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop());
+  v.srcObject = null; track = null; $('torch').hidden = true;
+}
+
+async function tick() {
+  if (!running) return;
+  if (v.readyState === v.HAVE_ENOUGH_DATA && !busy) {
+    let text = null;
+    try {
+      if (detector) {
+        const r = await detector.detect(v);
+        if (r.length) text = r[0].rawValue;
+      } else {
+        const w = v.videoWidth, h = v.videoHeight;
+        canvas.width = w; canvas.height = h;
+        ctx.drawImage(v, 0, 0, w, h);
+        const r = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
+        if (r) text = r.data;
+      }
+    } catch (e) {}
+    if (text) handle(text.trim(), false);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ---------- handling a ticket (scanned or typed) ----------
+async function handle(id, manual) {
+  if (!KEY || busy) return;
+  const now = Date.now();
+  if (!manual && id === lastId && now - lastAt < 3000) return;
+  lastId = id; lastAt = now; busy = true;
+
+  if (mode === 'register') {
+    pendingId = id;
+    $('pid').textContent = id;
+    $('pname').value = ''; $('pcontact').value = '';
+    $('panel').hidden = false;
+    setTimeout(() => $('pname').focus(), 50);
+    return;
+  }
+  show('wait', 'Checking…');
+  try {
+    const d = await lookup({ id: id });
+    if (d.status === 'ok') {
+      checkedIn++; $('count').textContent = checkedIn + ' checked in';
+      beep(true);
+      show('ok', '<div class="tag">✅ CHECKED IN</div><div class="name">' + esc(d.name) + '</div><small>' + esc(d.id || id) + ' · ' + esc(d.time) + '</small>');
+    } else if (d.status === 'duplicate') {
+      beep(false);
+      show('dup', '<div class="tag">⚠️ ALREADY CHECKED IN</div><div class="name">' + esc(d.name) + '</div><small>' + esc(d.id || id) + ' · ' + esc(d.time) + '</small>');
+    } else if (d.status === 'unregistered') {
+      beep(false);
+      show('bad', '<div class="tag">❌ NOT REGISTERED</div><small>Send this person to the registration desk · ' + esc(d.id || id) + '</small>');
+    } else {
+      beep(false);
+      show('bad', '<div class="tag">❌ ' + esc(d.message || 'INVALID TICKET') + '</div><small>' + esc(id) + '</small>');
+    }
+  } catch (e) {
+    beep(false); show('bad', '<div class="tag">❌ NETWORK ERROR</div><small>' + esc(e.message) + '</small>');
+  }
+  setTimeout(resume, 2200);
+}
+
+// manual entry (alternative when scanning fails)
+function manualGo() {
+  const id = $('mid').value.replace(/\s+/g, '').toUpperCase();
+  if (!id) { $('mid').focus(); return; }
+  $('mid').value = '';
+  handle(id, true);
+}
+$('mgo').onclick = manualGo;
+$('mid').onkeydown = (e) => { if (e.key === 'Enter') manualGo(); };
+
+// register panel
+$('pcancel').onclick = () => { $('panel').hidden = true; resume(); };
+$('psave').onclick = async () => {
+  const name = $('pname').value.trim();
+  if (!name) { $('pname').focus(); return; }
+  const contact = $('pcontact').value.trim();
+  $('panel').hidden = true;
+  show('wait', 'Saving…');
+  try {
+    const d = await lookup({ action: 'register', id: pendingId, name: name, contact: contact });
+    if (d.status === 'ok') { beep(true); show('ok', '<div class="tag">✅ REGISTERED</div><div class="name">' + esc(d.name) + '</div><small>' + esc(d.id || pendingId) + '</small>'); }
+    else if (d.status === 'assigned') { beep(false); show('dup', '<div class="tag">⚠️ TICKET ALREADY USED</div><div class="name">' + esc(d.name) + '</div>'); }
+    else if (d.status === 'invalid') { beep(false); show('bad', '<div class="tag">❌ TICKET NOT FOUND</div><small>' + esc(pendingId) + '</small>'); }
+    else { beep(false); show('bad', '<div class="tag">❌ ' + esc(d.message || 'ERROR') + '</div>'); }
+  } catch (e) {
+    beep(false); show('bad', '<div class="tag">❌ NETWORK ERROR</div><small>' + esc(e.message) + '</small>');
+  }
+  setTimeout(resume, 2200);
+};
+
+// start: reuse the code for this browser tab if it was entered already
+(function init() {
+  if (!API_URL) { $('lockmsg').textContent = 'No URL set. Tap ⚙ after unlocking, or open the page with ?api=…'; }
+  let saved = '';
+  try { saved = sessionStorage.getItem('code') || ''; } catch (e) {}
+  if (saved && API_URL) unlock(saved); else setTimeout(() => $('code').focus(), 100);
+})();
 </script>
 </body>
 </html>
